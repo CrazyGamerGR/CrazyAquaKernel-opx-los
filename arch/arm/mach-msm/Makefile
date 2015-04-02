@@ -437,3 +437,4 @@ obj-$(CONFIG_OPPO_DEVICE_IFNO)	+=  device_info.o
 #Add by yangrujin@bsp, 2015/5/21, Add for project info
 obj-$(CONFIG_OEM_PROJECT_INFO) += project_info.o
 #endif /* VENDOR_EDIT */
+obj-$(CONFIG_BRICKED_HOTPLUG) += bricked_hotplug.o
