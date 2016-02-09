@@ -439,3 +439,5 @@ obj-$(CONFIG_OEM_PROJECT_INFO) += project_info.o
 #endif /* VENDOR_EDIT */
 obj-$(CONFIG_BRICKED_HOTPLUG) += bricked_hotplug.o
 obj-$(CONFIG_MSM_LIMITER) += msm_limiter.o
+
+obj-$(CONFIG_CHARGE_LEVEL) += charge_level.o

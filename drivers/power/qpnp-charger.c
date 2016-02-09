@@ -10,6 +10,9 @@
  * GNU General Public License for more details.
  *
  */
+
+// #define DEBUG
+
 #define pr_fmt(fmt)	"CHG: %s: " fmt, __func__
 
 #include <linux/module.h>
@@ -41,6 +44,16 @@
 #include <linux/rtc.h>
 
 #include <linux/boot_mode.h>
+#endif
+
+#ifdef CONFIG_CHARGE_LEVEL
+#include "linux/charge_level.h"
+int ac_level = AC_CHARGE_LEVEL_DEFAULT;    // Set AC default charge level
+int usb_level  = USB_CHARGE_LEVEL_DEFAULT; // Set USB default charge level
+int charge_info_level_req = 0;	// requested charge current
+int charge_info_level_cur = 0;	// current charge current
+int charge_level = 0;			// 0 = stock charge logic, not 0 = current to set
+char charge_info_text[30] = "No charger";
 #endif
 
 /* Interrupt offsets */
@@ -1054,6 +1067,16 @@ oem_qpnp_chg_iusbmax_set(struct qpnp_chg_chip *chip, int mA)
 {
 	int rc = 0;
 	u8 usb_reg = 0, temp = 8;
+
+#ifdef CONFIG_CHARGE_LEVEL
+	if (charge_level != 0)
+			mA = charge_level;
+
+	charge_info_level_req = mA;
+
+	if (!chip->usb_present)
+		charge_info_level_req = 0;
+#endif
 
 	if (mA < 0 || mA > QPNP_CHG_I_MAX_MAX_MA) {
 		pr_err("bad mA=%d asked to set\n", mA);
@@ -2842,6 +2865,17 @@ get_prop_current_now(struct qpnp_chg_chip *chip)
 	if (chip->bms_psy) {
 		chip->bms_psy->get_property(chip->bms_psy,
 			  POWER_SUPPLY_PROP_CURRENT_NOW, &ret);
+
+#ifdef CONFIG_CHARGE_LEVEL
+		if (chip->usb_present)
+		{
+			charge_info_level_cur = ret.intval / 1000;
+			charge_info_level_cur = abs(charge_info_level_cur);
+		}
+		else
+			charge_info_level_cur = 0;
+#endif
+
 		return ret.intval;
 	} else {
 		pr_debug("No BMS supply registered return 0\n");
@@ -3076,6 +3110,35 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 	struct qpnp_chg_chip *chip = container_of(psy, struct qpnp_chg_chip,
 								batt_psy);
 	union power_supply_propval ret = {0,};
+
+#ifdef CONFIG_CHARGE_LEVEL
+	if (chip->usb_present)
+	{
+		switch(chip->usb_psy->type)
+		{
+			case POWER_SUPPLY_TYPE_MAINS:
+			case POWER_SUPPLY_TYPE_USB_DCP:
+				sprintf(charge_info_text, "AC charger");
+				charge_level = ac_level;
+				break;
+			case POWER_SUPPLY_TYPE_USB:
+				sprintf(charge_info_text, "USB charger");
+				charge_level = usb_level;
+				break;
+			default:
+				sprintf(charge_info_text, "Unknown charger %d", chip->usb_psy->type);
+				charge_level = 0;
+				break;
+		}
+	}
+	else
+	{
+		charge_level = 0;
+		charge_info_level_cur = 0;
+		charge_info_level_req = 0;
+		sprintf(charge_info_text, "No charger");
+	}
+#endif
 
 #ifdef CONFIG_VENDOR_EDIT
 	if (!chip->bms_psy) {
