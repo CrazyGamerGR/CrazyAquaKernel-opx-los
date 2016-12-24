@@ -24,27 +24,33 @@
 #include <linux/mfd/wcd9xxx/wcd9320_registers.h>
 
 #define SOUND_CONTROL_MAJOR_VERSION	3
-#define SOUND_CONTROL_MINOR_VERSION	7
+#define SOUND_CONTROL_MINOR_VERSION	8
 
 #ifdef CONFIG_STWEAKS_CONTROL
-static int lge_snd_ctrl_locked = 0;
-static int lge_stweaks_control = 0;
+static int lge_snd_ctrl_locked = 1;
+static int lge_stweaks_control = 1;
+int lge_snd_pa_ctrl_locked = 1;
+#else
+int snd_pa_ctrl_locked = 1;
 #endif
 
 extern struct snd_soc_codec *fauxsound_codec_ptr;
+#ifdef CONFIG_MACH_LGE
+static int wcd9xxx_hw_revision = 1;
+#else
 extern int wcd9xxx_hw_revision;
+#endif
 
 static int snd_ctrl_locked = 0;
 static int snd_rec_ctrl_locked = 0;
-int snd_pa_ctrl_locked = 1;
 
 unsigned int taiko_read(struct snd_soc_codec *codec, unsigned int reg);
 int taiko_write(struct snd_soc_codec *codec, unsigned int reg,
 		unsigned int value);
 
 #define REG_SZ  25
-static unsigned int cached_regs[] = {-1, -1, -1, -1, 0, 0, -1, -1, -1, -1,
-			    1, -1, -1, -1, -1, -1, 3, 3, -1, -1,
+static unsigned int cached_regs[] = {-1, -1, -1, -1, -2, -2, -1, -1, -1, -1,
+			    1, -1, -1, -1, -1, -1, 4, 3, -1, -1,
 			    -1, -1, -1, -1, -1};
 
 void snd_hax_cache_write(unsigned int reg, unsigned int value)
@@ -234,19 +240,22 @@ int snd_hax_reg_access(unsigned int reg)
 			/* Check if STweaks is locked. */
 			if (lge_snd_ctrl_locked > 0)
 				ret = 0;
-#endif
+#else
 			/* Check if FauxSound is locked. */
 			if (snd_ctrl_locked > 0)
 				ret = 0;
-			break;
 #endif
+#endif
+			break;
 		/* Digital headphones gain */
 		case TAIKO_A_CDC_RX1_VOL_CTL_B2_CTL:
 		case TAIKO_A_CDC_RX2_VOL_CTL_B2_CTL:
+#ifndef CONFIG_MACH_LGE
 		case TAIKO_A_CDC_RX3_VOL_CTL_B2_CTL:
 		case TAIKO_A_CDC_RX4_VOL_CTL_B2_CTL:
 		case TAIKO_A_CDC_RX5_VOL_CTL_B2_CTL:
 		case TAIKO_A_CDC_RX6_VOL_CTL_B2_CTL:
+#endif
 		/* Speaker gain */
 		case TAIKO_A_CDC_RX7_VOL_CTL_B2_CTL:
 		/* Line-out gain */
@@ -258,31 +267,37 @@ int snd_hax_reg_access(unsigned int reg)
 			/* Check if STweaks is locked. */
 			if (lge_snd_ctrl_locked > 0)
 				ret = 0;
-#endif
+#else
 			/* Check if FauxSound is locked. */
 			if (snd_ctrl_locked > 0)
 				ret = 0;
+#endif
 			break;
+#ifndef CONFIG_MACH_LGE
 		case TAIKO_A_CDC_TX1_VOL_CTL_GAIN:
 		case TAIKO_A_CDC_TX2_VOL_CTL_GAIN:
 		case TAIKO_A_CDC_TX3_VOL_CTL_GAIN:
 		case TAIKO_A_CDC_TX4_VOL_CTL_GAIN:
 		case TAIKO_A_CDC_TX5_VOL_CTL_GAIN:
+#endif
 		/* In-call microphone gain */
 		case TAIKO_A_CDC_TX6_VOL_CTL_GAIN:
 		/* Camera microphone gain */
 		case TAIKO_A_CDC_TX7_VOL_CTL_GAIN:
+#ifndef CONFIG_MACH_LGE
 		case TAIKO_A_CDC_TX8_VOL_CTL_GAIN:
 		case TAIKO_A_CDC_TX9_VOL_CTL_GAIN:
 		case TAIKO_A_CDC_TX10_VOL_CTL_GAIN:
+#endif
 #ifdef CONFIG_STWEAKS_CONTROL
 			/* Check if STweaks is locked. */
 			if (lge_snd_ctrl_locked > 0)
 				ret = 0;
-#endif
+#else
 			/* Check if FauxSound is locked. */
 			if (snd_rec_ctrl_locked > 0)
 				ret = 0;
+#endif
 			break;
 		default:
 			break;
@@ -319,6 +334,24 @@ static ssize_t lge_stweaks_control_store(struct kobject *kobj,
 	sscanf(buf, "%d", &val);
 
 	lge_stweaks_control = val;
+
+	return count;
+}
+
+static ssize_t lge_sound_pa_control_locked_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", lge_snd_pa_ctrl_locked);
+}
+
+static ssize_t lge_sound_pa_control_locked_store(struct kobject *kobj,
+                struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int inp;
+
+	sscanf(buf, "%d", &inp);
+
+	lge_snd_pa_ctrl_locked = inp;
 
 	return count;
 }
@@ -452,8 +485,7 @@ static ssize_t lge_headphone_pa_gain_store(struct kobject *kobj,
 
 	return count;
 }
-#endif
-
+#else
 static ssize_t sound_pa_control_locked_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
@@ -471,6 +503,7 @@ static ssize_t sound_pa_control_locked_store(struct kobject *kobj,
 
 	return count;
 }
+#endif
 
 static ssize_t mic_gain_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
@@ -543,11 +576,23 @@ static ssize_t cam_mic_gain_store(struct kobject *kobj,
 static ssize_t speaker_gain_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-        return sprintf(buf, "%u %u\n",
-			taiko_read(fauxsound_codec_ptr,
-				TAIKO_A_CDC_RX7_VOL_CTL_B2_CTL),
-			taiko_read(fauxsound_codec_ptr,
-				TAIKO_A_CDC_RX7_VOL_CTL_B2_CTL));
+#ifndef CONFIG_MACH_LGE
+	return sprintf(buf, "%u %u\n",
+		taiko_read(fauxsound_codec_ptr,
+			TAIKO_A_CDC_RX7_VOL_CTL_B2_CTL),
+		taiko_read(fauxsound_codec_ptr,
+			TAIKO_A_CDC_RX7_VOL_CTL_B2_CTL));
+#else
+	unsigned int retl, retr;
+
+	retl = taiko_read(fauxsound_codec_ptr,
+		TAIKO_A_CDC_RX7_VOL_CTL_B2_CTL);
+	retr = taiko_read(fauxsound_codec_ptr,
+		TAIKO_A_CDC_RX7_VOL_CTL_B2_CTL);
+
+	return sprintf(buf, "%u %u\n",
+		retl == 24 ? 0 : retl, retr == 24 ? 0 : retr);
+#endif
 }
 
 static ssize_t speaker_gain_store(struct kobject *kobj,
@@ -790,6 +835,18 @@ static struct kobj_attribute speaker_gain_attribute =
 		speaker_gain_store);
 
 #ifdef CONFIG_STWEAKS_CONTROL
+static struct kobj_attribute lge_stweaks_control_attribute =
+	__ATTR(lge_stweaks_control,
+		0666,
+		lge_stweaks_control_show,
+		lge_stweaks_control_store);
+
+static struct kobj_attribute lge_sound_pa_control_locked_attribute =
+	__ATTR(lge_sound_pa_control_locked,
+		0666,
+		lge_sound_pa_control_locked_show,
+		lge_sound_pa_control_locked_store);
+
 static struct kobj_attribute lge_mic_gain_attribute =
 	__ATTR(lge_mic_gain,
 		0666,
@@ -819,19 +876,13 @@ static struct kobj_attribute lge_headphone_gain_attribute =
 		0666,
 		headphone_gain_show,
 		lge_headphone_gain_store);
-
-static struct kobj_attribute lge_stweaks_control_attribute =
-	__ATTR(lge_stweaks_control,
-		0666,
-		lge_stweaks_control_show,
-		lge_stweaks_control_store);
-#endif
-
+#else
 static struct kobj_attribute sound_pa_control_locked_attribute =
 	__ATTR(sound_pa_control_locked,
 		0666,
 		sound_pa_control_locked_show,
 		sound_pa_control_locked_store);
+#endif
 
 static struct kobj_attribute headphone_gain_attribute =
 	__ATTR(gpl_headphone_gain,
@@ -873,14 +924,16 @@ static struct attribute *sound_control_attrs[] =
 		&mic_gain_attribute.attr,
 		&speaker_gain_attribute.attr,
 #ifdef CONFIG_STWEAKS_CONTROL
+		&lge_stweaks_control_attribute.attr,
+		&lge_sound_pa_control_locked_attribute.attr,
 		&lge_headphone_gain_attribute.attr,
 		&lge_cam_mic_gain_attribute.attr,
 		&lge_mic_gain_attribute.attr,
 		&lge_speaker_gain_attribute.attr,
 		&lge_headphone_pa_gain_attribute.attr,
-		&lge_stweaks_control_attribute.attr,
-#endif
+#else
 		&sound_pa_control_locked_attribute.attr,
+#endif
 		&headphone_gain_attribute.attr,
 		&headphone_pa_gain_attribute.attr,
 		&sound_control_locked_attribute.attr,
