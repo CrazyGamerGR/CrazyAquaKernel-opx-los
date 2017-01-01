@@ -24,7 +24,7 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 
-#define FB_BOOST_MS 900
+#define FB_BOOST_MS 500
 
 enum boost_status {
 	UNBOOST,
