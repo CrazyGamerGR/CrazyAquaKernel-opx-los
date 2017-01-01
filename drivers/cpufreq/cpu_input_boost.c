@@ -133,8 +133,7 @@ static void __cpuinit ib_boost_main(struct work_struct *work)
 
 	for_each_online_cpu(cpu) {
 		/* Calculate boost duration for each CPU (CPU0 is boosted the longest) */
-		/* TODO: Make this more standard and configurable from sysfs */
-		boost_ms[cpu] = 1500 - (cpu * 200) - (nr_cpus_to_boost * 250);
+		boost_ms[cpu] = 1650 - (cpu * 200) - (nr_cpus_to_boost * 250);
 		cpu_boost_cpu(cpu);
 		nr_boosted++;
 		if (nr_boosted == nr_cpus_to_boost)
