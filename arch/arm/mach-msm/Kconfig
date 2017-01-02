@@ -3105,6 +3105,11 @@ config CHARGE_LEVEL
 	default y
 	help
 	  Allows configuration of ac and usb charging levels
+
+config PVS_LEVEL_INTERFACE
+	bool "Expose PVS level information"
+	help
+	 Allow PVS level to be shown
 	
 endif
 
