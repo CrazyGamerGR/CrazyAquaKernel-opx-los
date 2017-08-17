@@ -12,8 +12,8 @@ export CROSS_COMPILE=/home/francesco/arm-linux-androideabi-4.9/bin/arm-linux-and
 ##########################################
 mkdir output
 ##########################################
-make -C $(pwd) O=output cm_onyx_defconfig 
-make -C $(pwd) O=output
+make -C $(pwd) O=output lineageos_onyx_defconfig 
+make -j64 -C $(pwd) O=output
 ##########################################
 cp output/arch/arm/boot/Image $(pwd)/arch/arm/boot/zImage
 ##########################################
